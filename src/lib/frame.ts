@@ -18,15 +18,20 @@ export async function closeFrame() {
   }
 }
 
-export async function composeCast(text: string, url?: string) {
+export async function shareScore(text: string, url?: string) {
+  // In frame SDK v0.0.26, composeCast is not available
+  // Use openUrl to open Warpcast composer instead
   try {
-    // composeCast is not available in the current SDK version
-    // Consider using an alternative method or opening a URL instead
-    if (url) {
-      await openUrl(url);
-    }
+    const encodedText = encodeURIComponent(text);
+    const shareUrl = url
+      ? `https://warpcast.com/~/compose?text=${encodedText}&embeds[]=${encodeURIComponent(url)}`
+      : `https://warpcast.com/~/compose?text=${encodedText}`;
+    sdk.actions.openUrl(shareUrl);
   } catch {
-    // Not in frame context
+    // Fallback for standalone browser
+    if (url) {
+      window.open(url, "_blank");
+    }
   }
 }
 

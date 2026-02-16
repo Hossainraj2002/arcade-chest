@@ -5,16 +5,23 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import "@coinbase/onchainkit/styles.css";
 import { AppProviders } from "@/components/providers/AppProviders";
+import { AppShell } from "@/components/layout/AppShell";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Arcade Chest | Play Games, Win Rewards",
-  description:
-    "Play 5 classic games, earn points, open treasure chests, and win NFTs & USDC on Base.",
+  title: "Arcade Chest",
+  description: "Five games. One leaderboard. Real rewards on Base.",
   openGraph: {
     title: "Arcade Chest",
-    description: "Play games. Earn points. Open chests. Win rewards on Base.",
+    description: "Five games. One leaderboard. Real rewards on Base.",
+  },
+  other: {
+    "fc:frame": "vNext",
+    "fc:frame:image": "https://basedgame.vercel.app/og-image.png",
+    "fc:frame:button:1": "Play Now",
+    "fc:frame:button:1:action": "launch_frame",
+    "fc:frame:button:1:target": "https://basedgame.vercel.app",
   },
 };
 
@@ -30,10 +37,13 @@ export default function RootLayout({
           name="viewport"
           content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
         />
-        <meta name="theme-color" content="#1a1a2e" />
+        <meta name="theme-color" content="#13121d" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)" />
       </head>
-      <body className={inter.className}>
-        <AppProviders>{children}</AppProviders>
+      <body className={`${inter.variable} font-sans`}>
+        <AppProviders>
+          <AppShell>{children}</AppShell>
+        </AppProviders>
       </body>
     </html>
   );

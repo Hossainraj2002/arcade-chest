@@ -10,7 +10,6 @@ import { useUserStore } from "@/stores/useUserStore";
 import { Button } from "@/components/ui/Button";
 import { PostGameModal } from "@/components/shared/PostGameModal";
 import { GAME_CONFIG, type GameId } from "@/lib/constants";
-import { motion } from "framer-motion";
 import { ArrowLeft, Coins, Play } from "lucide-react";
 import type { RoundEndRequest } from "@/types";
 
@@ -46,108 +45,78 @@ export function GameWrapper({ gameId, children }: GameWrapperProps) {
     [roundId, endGame]
   );
 
-  const hasTokens = (balance?.accessTokensOffchain || 0) >= 1;
+  const hasTokens = (balance?.accessTokensOffchain ?? 0) >= 1;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Game header */}
-      {!isPlaying && (
-        <div className="fixed top-0 left-0 right-0 z-40 glass-nav px-4 py-3">
-          <div className="flex items-center justify-between max-w-md mx-auto">
-            <button
-              onClick={() => router.push("/games")}
-              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </button>
-            <div className="flex items-center gap-2">
-              <span className="text-lg">{config.icon}</span>
-              <span className="font-bold text-sm">{config.name}</span>
-            </div>
-            <div className="glass flex items-center gap-1 px-2 py-1 rounded-full">
-              <Coins className="h-3 w-3 text-amber-400" />
-              <span className="text-xs font-bold">
-                {balance?.accessTokensOffchain || 0}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
+    <div className="py-3">
       {/* Pre-game screen */}
       {!isPlaying && (
-        <div className="pt-20 pb-8 px-4 max-w-md mx-auto">
-          <motion.div
-            className="flex flex-col items-center gap-6 mt-8"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+        <div className="space-y-5">
+          {/* Back link */}
+          <button
+            onClick={() => router.push("/games")}
+            className="flex items-center gap-1 text-sm transition-colors"
+            style={{ color: "var(--muted-fg)" }}
           >
-            {/* Game icon */}
+            <ArrowLeft size={16} /> Back to Games
+          </button>
+
+          {/* Game hero */}
+          <div className="flex flex-col items-center gap-4">
             <div
-              className={`h-24 w-24 rounded-3xl bg-gradient-to-br ${config.gradient} flex items-center justify-center text-5xl shadow-2xl`}
+              className={`h-20 w-20 rounded-3xl bg-gradient-to-br ${config.gradient} flex items-center justify-center text-4xl shadow-xl`}
             >
               {config.icon}
             </div>
-
             <div className="text-center">
-              <h1 className="text-2xl font-bold mb-1">{config.name}</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-2xl font-bold">{config.name}</h1>
+              <p className="text-sm" style={{ color: "var(--muted-fg)" }}>
                 {config.description}
               </p>
             </div>
+          </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-3 w-full">
-              <div className="glass-card text-center py-3">
-                <p className="text-xs text-muted-foreground">Max Points</p>
-                <p className="font-bold text-sm">{config.basePoints}</p>
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: "Max pts", value: config.basePoints },
+              { label: "Chest @", value: `${config.chestThreshold * 100}%` },
+              { label: "Max time", value: `${Math.floor(config.maxDuration / 60)}m` },
+            ].map((s) => (
+              <div key={s.label} className="glass-card text-center py-3">
+                <p className="text-xs" style={{ color: "var(--muted-fg)" }}>{s.label}</p>
+                <p className="font-bold text-sm">{s.value}</p>
               </div>
-              <div className="glass-card text-center py-3">
-                <p className="text-xs text-muted-foreground">Chest At</p>
-                <p className="font-bold text-sm">
-                  {config.chestThreshold * 100}%
-                </p>
-              </div>
-              <div className="glass-card text-center py-3">
-                <p className="text-xs text-muted-foreground">Max Time</p>
-                <p className="font-bold text-sm">
-                  {Math.floor(config.maxDuration / 60)}m
-                </p>
-              </div>
+            ))}
+          </div>
+
+          {error && (
+            <div className="glass-card p-3" style={{ borderColor: "rgba(239,68,68,0.3)" }}>
+              <p className="text-xs text-red-400 text-center">{error}</p>
             </div>
+          )}
 
-            {/* Error */}
-            {error && (
-              <div className="glass-card p-3 border-red-500/30 w-full">
-                <p className="text-xs text-red-400 text-center">{error}</p>
-              </div>
+          <Button
+            size="lg"
+            className="w-full"
+            onClick={handleStart}
+            disabled={!hasTokens}
+            loading={starting || loading}
+          >
+            {hasTokens ? (
+              <>
+                <Play size={18} /> Start Game · 1 Token
+              </>
+            ) : (
+              "No tokens — check in or buy"
             )}
-
-            {/* Start button */}
-            <Button
-              size="lg"
-              className="w-full"
-              onClick={handleStart}
-              disabled={!hasTokens}
-              loading={starting || loading}
-            >
-              {hasTokens ? (
-                <>
-                  <Play className="h-5 w-5" />
-                  Start Game (1 Token)
-                </>
-              ) : (
-                "No Tokens — Check In or Buy"
-              )}
-            </Button>
-          </motion.div>
+          </Button>
         </div>
       )}
 
-      {/* Active game */}
+      {/* Active game — renders inside the shell so nav stays visible */}
       {isPlaying && (
-        <div className="game-canvas-container w-full h-screen">
+        <div className="game-canvas-container -mx-4" style={{ minHeight: "60dvh" }}>
           {children({
             onGameEnd: handleGameEnd,
             isPlaying,
