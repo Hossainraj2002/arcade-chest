@@ -11,15 +11,17 @@ import { useAppTransaction } from "@/hooks/useTransaction";
 import { useUser } from "@/hooks/useUser";
 import { buildBuyTokensTx } from "@/lib/transactions";
 import { ECONOMY } from "@/lib/constants";
-import { Coins, ShoppingBag, Check, AlertCircle } from "lucide-react";
+import { Coins, ShoppingBag } from "lucide-react";
 import { useAccount } from "wagmi";
 
 export function TokenShop() {
   const balance = useUserStore((s) => s.balance);
   const { address } = useAccount();
-  const { refreshUser } = useUser(address);
-  const { sendTx, isSending, isConfirming, isConfirmed, error } =
-    useAppTransaction();
+
+  // IMPORTANT: do NOT auto-init here, AppShell already does it.
+  const { refreshUser } = useUser(address, { autoInit: false });
+
+  const { sendTx, isSending } = useAppTransaction();
   const [showModal, setShowModal] = useState(false);
 
   const handleBuy = async () => {
@@ -27,7 +29,6 @@ export function TokenShop() {
     const hash = await sendTx(tx);
 
     if (hash) {
-      // Tell backend to credit tokens
       await fetch("/api/tokens/buy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -38,8 +39,8 @@ export function TokenShop() {
         }),
       });
 
-      // Refresh user data
       await refreshUser();
+      setShowModal(false);
     }
   };
 
@@ -55,9 +56,7 @@ export function TokenShop() {
               <p className="text-sm font-bold">
                 {balance?.accessTokensOffchain || 0} Tokens
               </p>
-              <p className="text-xs text-muted-foreground">
-                1 token = 1 game play
-              </p>
+              <p className="text-xs text-muted-foreground">1 token = 1 game play</p>
             </div>
           </div>
 
@@ -68,53 +67,28 @@ export function TokenShop() {
         </div>
       </Card>
 
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title="🪙 Buy Access Tokens"
-      >
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="🪙 Buy Access Tokens">
         <div className="space-y-4">
           <div className="glass-card p-4 text-center">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Coins className="h-6 w-6 text-amber-400" />
-              <span className="text-2xl font-bold">
-                {ECONOMY.TOKEN_PURCHASE_AMOUNT}
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground">Access Tokens</p>
-            <p className="text-lg font-bold mt-2">
-              {ECONOMY.TOKEN_PURCHASE_PRICE_USDC} USDC
+            <p className="text-sm font-bold">
+              {ECONOMY.TOKEN_PURCHASE_AMOUNT} Tokens
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Costs {ECONOMY.TOKEN_PURCHASE_PRICE_USDC} USDC
             </p>
           </div>
 
-          {error && (
-            <div className="flex items-center gap-2 text-xs text-red-400 glass-card p-3">
-              <AlertCircle className="h-4 w-4 flex-shrink-0" />
-              {error}
-            </div>
-          )}
+          <Button
+            variant="primary"
+            className="w-full"
+            onClick={handleBuy}
+            loading={isSending}
+          >
+            Confirm Purchase
+          </Button>
 
-          {isConfirmed ? (
-            <div className="flex items-center justify-center gap-2 text-emerald-400 py-3">
-              <Check className="h-5 w-5" />
-              <span className="font-bold">Tokens Added!</span>
-            </div>
-          ) : (
-            <Button
-              className="w-full"
-              onClick={handleBuy}
-              loading={isSending || isConfirming}
-            >
-              {isSending
-                ? "Confirm in Wallet..."
-                : isConfirming
-                ? "Processing..."
-                : `Pay ${ECONOMY.TOKEN_PURCHASE_PRICE_USDC} USDC`}
-            </Button>
-          )}
-
-          <p className="text-[10px] text-muted-foreground text-center">
-            Gas fees sponsored by Base • Powered by Smart Wallet
+          <p className="text-[11px] text-muted-foreground text-center">
+            You’ll sign a transaction in your wallet.
           </p>
         </div>
       </Modal>

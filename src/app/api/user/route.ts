@@ -7,6 +7,20 @@ import { fetchUserByAddress } from "@/lib/neynar";
 import { ECONOMY } from "@/lib/constants";
 import { isToday, isYesterday } from "@/lib/utils";
 
+/**
+ * DEV + LOCAL SAFETY THROTTLE
+ * Prevents UI loops from hammering /api/user and crashing Node/Prisma/Neynar.
+ * - Only throttles repeated calls for the SAME wallet within a short window.
+ * - For throttled calls, we return the current user state FAST (no Neynar fetch).
+ *
+ * NOTE:
+ * In serverless, memory may not persist between invocations, but this still helps:
+ * - local dev: 100% effective
+ * - production: best-effort and reduces burst load when the same instance serves repeated calls
+ */
+const lastCallByWallet = new Map<string, number>();
+const THROTTLE_MS = 2500;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -21,14 +35,51 @@ export async function POST(request: NextRequest) {
 
     const normalizedWallet = wallet.toLowerCase();
 
+    // ---- Throttle check (only for repeated calls) ----
+    const now = Date.now();
+    const last = lastCallByWallet.get(normalizedWallet) ?? 0;
+    const isThrottled = now - last < THROTTLE_MS;
+
+    // Always update last call timestamp early (prevents stampede)
+    lastCallByWallet.set(normalizedWallet, now);
+
     // Check if user exists
     let user = await prisma.user.findUnique({
       where: { wallet: normalizedWallet },
       include: { balance: true, streak: true },
     });
 
+    // If user exists and we are throttling, return quickly (skip Neynar update)
+    if (user && isThrottled) {
+      const streakInfo = getStreakInfo(user.streak);
+
+      return NextResponse.json({
+        profile: {
+          wallet: user.wallet,
+          displayName: user.displayName,
+          pfpUrl: user.pfpUrl,
+          fid: user.fid,
+          referralCode: user.referralCode,
+          createdAt: user.createdAt.toISOString(),
+        },
+        balance: user.balance
+          ? {
+              accessTokensOffchain: user.balance.accessTokensOffchain,
+              pointsTotal: user.balance.pointsTotal,
+              pointsSeason: user.balance.pointsSeason,
+              chestFreePending: user.balance.chestFreePending,
+              chestPremiumPending: user.balance.chestPremiumPending,
+              usdcClaimable: user.balance.usdcClaimable,
+            }
+          : null,
+        streak: streakInfo,
+        throttled: true,
+      });
+    }
+
     if (user) {
       // Existing user - update Neynar data if we have fid
+      // (Note: keep your existing behavior)
       if (fid && !user.fid) {
         const neynarUser = await fetchUserByAddress(normalizedWallet);
         if (neynarUser) {
@@ -158,7 +209,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function getStreakInfo(streak: { currentStreak: number; lastCheckin: Date | null; longestStreak: number } | null) {
+function getStreakInfo(
+  streak: { currentStreak: number; lastCheckin: Date | null; longestStreak: number } | null
+) {
   if (!streak) {
     return {
       currentStreak: 0,

@@ -16,7 +16,10 @@ import { useAccount } from "wagmi";
 export function CheckInCard() {
   const streak = useUserStore((s) => s.streak);
   const { address } = useAccount();
-  const { checkin } = useUser(address);
+
+  // IMPORTANT: do NOT auto-init here, AppShell already does it.
+  const { checkin } = useUser(address, { autoInit: false });
+
   const [loading, setLoading] = useState(false);
   const [justCheckedIn, setJustCheckedIn] = useState(false);
 

@@ -4,20 +4,42 @@ import { useCallback, useEffect, useRef } from "react";
 import { useUserStore } from "@/stores/useUserStore";
 import { useFrame } from "@/components/providers/FrameProvider";
 
-export function useUser(wallet: string | undefined) {
+type UseUserOptions = {
+  /**
+   * Default: false
+   * Only AppShell should set autoInit: true.
+   */
+  autoInit?: boolean;
+};
+
+export function useUser(wallet: string | undefined, options?: UseUserOptions) {
+  const autoInit = options?.autoInit ?? false;
+
   const {
     setProfile,
     setBalance,
     setStreak,
     setLoading,
     setAuthenticated,
-    isLoading,
   } = useUserStore();
-  const initRef = useRef(false);
+
   const { context } = useFrame();
+
+  // Prevent repeated init storms (even if effects re-run)
+  const initInFlightRef = useRef(false);
+  const lastInitAtRef = useRef(0);
 
   const initUser = useCallback(
     async (walletAddr: string, referralCode?: string, fid?: number) => {
+      const now = Date.now();
+
+      // hard throttle: max 1 init per 5 seconds
+      if (now - lastInitAtRef.current < 5000) return;
+      if (initInFlightRef.current) return;
+
+      initInFlightRef.current = true;
+      lastInitAtRef.current = now;
+
       setLoading(true);
       try {
         const res = await fetch("/api/user", {
@@ -30,18 +52,25 @@ export function useUser(wallet: string | undefined) {
           }),
         });
 
+        if (!res.ok) {
+          const err = await res.text().catch(() => "");
+          console.error("User init failed:", res.status, err);
+          setAuthenticated(false);
+          return;
+        }
+
         const data = await res.json();
 
-        if (res.ok) {
-          setProfile(data.profile);
-          setBalance(data.balance);
-          setStreak(data.streak);
-          setAuthenticated(true);
-        }
+        setProfile(data.profile);
+        setBalance(data.balance);
+        setStreak(data.streak);
+        setAuthenticated(true);
       } catch (error) {
         console.error("Failed to init user:", error);
+        setAuthenticated(false);
       } finally {
         setLoading(false);
+        initInFlightRef.current = false;
       }
     },
     [setProfile, setBalance, setStreak, setLoading, setAuthenticated]
@@ -62,7 +91,6 @@ export function useUser(wallet: string | undefined) {
         await initUser(walletAddr);
         return true;
       }
-
       return false;
     } catch {
       return false;
@@ -71,34 +99,22 @@ export function useUser(wallet: string | undefined) {
 
   const refreshUser = useCallback(async () => {
     const walletAddr = useUserStore.getState().profile?.wallet;
-    if (walletAddr) {
-      await initUser(walletAddr);
-    }
+    if (walletAddr) await initUser(walletAddr);
   }, [initUser]);
 
   useEffect(() => {
-    if (wallet && !initRef.current) {
-      initRef.current = true;
+    if (!autoInit) return;
+    if (!wallet) return;
 
-      // Check for referral code in URL
-      let ref: string | undefined;
-      try {
-        const params = new URLSearchParams(window.location.search);
-        ref = params.get("ref") || undefined;
-      } catch {
-        // SSR safe
-      }
+    let ref: string | undefined;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      ref = params.get("ref") || undefined;
+    } catch {}
 
-      // Get FID from frame context
-      const fid = context?.user?.fid;
+    const fid = context?.user?.fid;
+    initUser(wallet, ref, fid);
+  }, [wallet, autoInit, context, initUser]);
 
-      initUser(wallet, ref, fid);
-    }
-
-    if (!wallet) {
-      initRef.current = false;
-    }
-  }, [wallet, initUser, context]);
-
-  return { initUser, checkin, refreshUser, isLoading };
+  return { initUser, checkin, refreshUser };
 }
