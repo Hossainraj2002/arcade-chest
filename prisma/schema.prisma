@@ -1,12 +1,11 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -45,50 +44,50 @@ model Balance {
 }
 
 model CheckIn {
-  id        String   @id @default(uuid())
-  wallet    String
-  checkedAt DateTime @default(now())
-  tokensGranted Int  @default(5)
-  streakDay Int      @default(1)
-  bonusPercent Int   @default(0)
+  id            String   @id @default(uuid())
+  wallet        String
+  checkedAt     DateTime @default(now())
+  tokensGranted Int      @default(5)
+  streakDay     Int      @default(1)
+  bonusPercent  Int      @default(0)
 
   user User @relation(fields: [wallet], references: [wallet])
 }
 
 model Streak {
-  wallet       String   @id
-  currentStreak Int     @default(0)
-  lastCheckin  DateTime?
-  longestStreak Int     @default(0)
+  wallet        String    @id
+  currentStreak Int       @default(0)
+  lastCheckin   DateTime?
+  longestStreak Int       @default(0)
 
   user User @relation(fields: [wallet], references: [wallet])
 }
 
 model GameRun {
-  id               String   @id @default(uuid())
+  id               String    @id @default(uuid())
   wallet           String
   gameId           String
-  startedAt        DateTime @default(now())
+  startedAt        DateTime  @default(now())
   endedAt          DateTime?
   clientRunSummary String?
-  validatedScore   Int      @default(0)
-  pointsAwarded    Int      @default(0)
+  validatedScore   Int       @default(0)
+  pointsAwarded    Int       @default(0)
   nonce            String
-  status           String   @default("active")
-  chestGranted     Boolean  @default(false)
+  status           String    @default("active")
+  chestGranted     Boolean   @default(false)
 
   user User @relation(fields: [wallet], references: [wallet])
 }
 
 model ChestOpen {
-  id             String   @id @default(uuid())
-  wallet         String
-  type           String
-  createdAt      DateTime @default(now())
-  openedAt       DateTime?
-  rewardType     String?
-  rewardAmount   Float?
-  txHash         String?
+  id           String    @id @default(uuid())
+  wallet       String
+  type         String
+  createdAt    DateTime  @default(now())
+  openedAt     DateTime?
+  rewardType   String?
+  rewardAmount Float?
+  txHash       String?
 
   user User @relation(fields: [wallet], references: [wallet])
 }
