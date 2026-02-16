@@ -1,0 +1,124 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  wallet         String   @id
+  createdAt      DateTime @default(now())
+  referrerWallet String?
+  referralCode   String   @unique
+  displayName    String?
+  pfpUrl         String?
+  fid            Int?     @unique
+  isFlagged      Boolean  @default(false)
+  country        String?
+
+  balance        Balance?
+  gameRuns       GameRun[]
+  chestOpens     ChestOpen[]
+  referralsMade  ReferralEarning[] @relation("referrer")
+  referralsFrom  ReferralEarning[] @relation("referred")
+  checkins       CheckIn[]
+  streak         Streak?
+
+  referrer       User?  @relation("referrals", fields: [referrerWallet], references: [wallet])
+  referrals      User[] @relation("referrals")
+}
+
+model Balance {
+  wallet              String @id
+  accessTokensOffchain Int   @default(0)
+  pointsTotal         Int    @default(0)
+  pointsSeason        Int    @default(0)
+  chestFreePending    Int    @default(0)
+  chestPremiumPending Int    @default(0)
+  usdcClaimable       Float  @default(0)
+
+  user User @relation(fields: [wallet], references: [wallet])
+}
+
+model CheckIn {
+  id        String   @id @default(uuid())
+  wallet    String
+  checkedAt DateTime @default(now())
+  tokensGranted Int  @default(5)
+  streakDay Int      @default(1)
+  bonusPercent Int   @default(0)
+
+  user User @relation(fields: [wallet], references: [wallet])
+}
+
+model Streak {
+  wallet       String   @id
+  currentStreak Int     @default(0)
+  lastCheckin  DateTime?
+  longestStreak Int     @default(0)
+
+  user User @relation(fields: [wallet], references: [wallet])
+}
+
+model GameRun {
+  id               String   @id @default(uuid())
+  wallet           String
+  gameId           String
+  startedAt        DateTime @default(now())
+  endedAt          DateTime?
+  clientRunSummary String?
+  validatedScore   Int      @default(0)
+  pointsAwarded    Int      @default(0)
+  nonce            String
+  status           String   @default("active")
+  chestGranted     Boolean  @default(false)
+
+  user User @relation(fields: [wallet], references: [wallet])
+}
+
+model ChestOpen {
+  id             String   @id @default(uuid())
+  wallet         String
+  type           String
+  createdAt      DateTime @default(now())
+  openedAt       DateTime?
+  rewardType     String?
+  rewardAmount   Float?
+  txHash         String?
+
+  user User @relation(fields: [wallet], references: [wallet])
+}
+
+model ReferralEarning {
+  id             String   @id @default(uuid())
+  referrerWallet String
+  referredWallet String
+  source         String
+  amount         Int
+  createdAt      DateTime @default(now())
+
+  referrer User @relation("referrer", fields: [referrerWallet], references: [wallet])
+  referred User @relation("referred", fields: [referredWallet], references: [wallet])
+}
+
+model Season {
+  id               String   @id @default(uuid())
+  name             String
+  startAt          DateTime
+  endAt            DateTime
+  status           String   @default("active")
+  rewardPoolConfig String?
+}
+
+model LeaderboardSnapshot {
+  id        String   @id @default(uuid())
+  seasonId  String?
+  wallet    String
+  points    Int
+  rank      Int
+  updatedAt DateTime @default(now())
+}
